@@ -1,8 +1,8 @@
 Name:          derive-trie
 Version:       0.1.0
 Stability:     Provisional
-Synopsis:      Automatical derivation of Trie implementations.
-Description:   Automatical derivation of Trie implementations from user
+Synopsis:      Automatic derivation of Trie implementations.
+Description:   Automatic derivation of Trie implementations from user
                defined key types with Template Haskell. Uses KeyMap class
                as interface for tries.
 License:       BSD3
