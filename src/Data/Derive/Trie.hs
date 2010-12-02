@@ -10,20 +10,41 @@
         -fno-warn-unused-matches
   #-}
 
-{- This module provides the template to automatically derive a
-   Trie implementation from a data type, which uses this data type
-   as key. The template generates a trie data type and an instance of the
-   KeyMap class for every given key, as described in the paper
-   "Efficient, Modular Tries" by Sebastian Fischer and Frank Huch is generated
-   using Template Haskell
+{- | This module provides the template to automatically derive a
+     Trie implementation from a data type, which uses this data type
+     as key. The template generates a trie data type and an instance of the
+     'KeyMap' class for every given key, as described in the paper
+     \"Efficient, Modular Tries\" by Sebastian Fischer and Frank Huch is
+     generated using Template Haskell.
 
-   Usage: $(deriveTrie [''<keytypename1>,''<keytypename2>,..])
+     Usage:
+
+     > import Data.Derive.Trie
+     > import Data.KeyMap
+     > ...
+     > $(deriveTrie [''<keytypename1>,''<keytypename2>,..])
+
+     You will also need to enable the following language extensions:
+
+     - MultiParamTypeClasses
+     - TemplateHaskell
+     - UndecidableInstances
+
+     And if you want to derive Tries structures for type synonyms you will also
+     need:
+
+     - TypeSynonymInstances
  -}
 module Data.Derive.Trie
-                   (
-                     deriveTrie,
-                     tidy, ensureTrie, trieToMaybe -- used in generated code
-                    )  where
+    (
+    -- * Deriving Trie structures
+      deriveTrie
+
+    -- * Used in generated code
+    , tidy
+    , ensureTrie
+    , trieToMaybe
+)  where
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
@@ -31,6 +52,7 @@ import Data.Maybe (fromMaybe,isJust,fromJust)
 import Control.Monad (foldM)
 import Data.List (nub,nubBy,find)
 import Debug.Trace
+import Data.KeyMap (KeyMap)
 import qualified Data.KeyMap as KeyMap
 import qualified Data.Map
 import qualified Data.IntMap
@@ -476,7 +498,7 @@ mkKeyMapInstanceDec key2trie triename tvarnames methods =
       keyMapCxt  = map (mkKeyMapCxt trie2key) tvarnamesWithoutVal
       keyType    = mkKeyType trie2key tvarnamesWithoutVal triename
       trieType   = mkTrieType key2trie keyType
-      keyMapType = AppT (AppT (ConT ''KeyMap.KeyMap) keyType) trieType
+      keyMapType = AppT (AppT (ConT ''KeyMap) keyType) trieType
   in [InstanceD keyMapCxt keyMapType methods]
 
 -- builds the context of the KeyMap-instance-declaration for a given type
@@ -484,7 +506,7 @@ mkKeyMapInstanceDec key2trie triename tvarnames methods =
 mkKeyMapCxt :: [(Type,Type)] -> Name -> Pred
 mkKeyMapCxt trie2key tvarname =
     let keytvar = fromJust (lookup (VarT tvarname) trie2key)
-     in  ClassP ''KeyMap.KeyMap [keytvar, VarT tvarname]
+     in  ClassP ''KeyMap [keytvar, VarT tvarname]
 
 -- builds the key type needed for the KeyMap-instance-declaration
 -- variable
@@ -979,7 +1001,7 @@ addVal (t:ts) valtype = t : addVal ts valtype
 -- this function lifts the type (map val -> map val) to
 -- (Maybe (map val) -> Maybe (map val))
 -- for use with alter-continuation
-lift1 :: KeyMap.KeyMap key map
+lift1 :: KeyMap key map
       => (map val -> map val) -> Maybe (map val) -> Maybe (map val)
 lift1 f =  trieToMaybe . f . maybe KeyMap.empty id
 
@@ -987,7 +1009,7 @@ lift1 f =  trieToMaybe . f . maybe KeyMap.empty id
 -- this function lifts the type (map val -> map val' -> map val'') to
 -- (Maybe (map val) -> Maybe (map val') -> Maybe (map val''))
 -- for use with combine
-lift2 :: KeyMap.KeyMap key map
+lift2 :: KeyMap key map
       => (map val -> map val' -> map val'')
       -> Maybe (map val) -> Maybe (map val') -> Maybe (map val'')
 lift2 f mx my
@@ -997,18 +1019,18 @@ lift2 f mx my
 
 
 
---tidym :: KeyMap.KeyMap key map => map val -> Maybe (map val)
+--tidym :: KeyMap key map => map val -> Maybe (map val)
 --tidym t = if KeyMap.null t then Nothing else Just t
 
-tidy :: KeyMap.KeyMap key map => map val -> map val
+tidy :: KeyMap key map => map val -> map val
 tidy m = if KeyMap.null m then KeyMap.empty else m
 
-trieToMaybe :: KeyMap.KeyMap key map => map val -> Maybe (map val)
+trieToMaybe :: KeyMap key map => map val -> Maybe (map val)
 trieToMaybe t = if KeyMap.null t then Nothing else Just t
 
 
 
-ensureTrie :: KeyMap.KeyMap key map => Maybe (map val) -> map val
+ensureTrie :: KeyMap key map => Maybe (map val) -> map val
 ensureTrie m = fromMaybe KeyMap.empty m
 
 maybe2trie :: ExpQ
@@ -1077,7 +1099,7 @@ combinenD 0 =
   [d| combine0 :: (Maybe val -> Maybe val' -> Maybe val'') -> Maybe val -> Maybe val' -> Maybe val'';combine0 f = f |]
 
 combinenD 1 = do
-  [d| combine1 :: KeyMap.KeyMap key map => (Maybe val -> Maybe val' -> Maybe val'') ->  (map val) -> (map val') -> (map val'');combine1 f ma mb = {-tidy-} (KeyMap.combine f ma mb) |]
+  [d| combine1 :: KeyMap key map => (Maybe val -> Maybe val' -> Maybe val'') ->  (map val) -> (map val') -> (map val'');combine1 f ma mb = {-tidy-} (KeyMap.combine f ma mb) |]
 
 combinenD n =
   do
@@ -1090,7 +1112,7 @@ combinenD n =
    maname <- newName "ma"
    mbname <-  newName "mb"
    --trace ("valNames: " ++ show valNames) (return ())
-   let context = map (\ (k,m) -> (ClassP ''KeyMap.KeyMap [k, m]))
+   let context = map (\ (k,m) -> (ClassP ''KeyMap [k, m]))
                      (zip (map VarT keyNames) (map VarT mapNames))
   --   f = (Maybe val -> Maybe val' -> Maybe val'')
        f = AppT (AppT ArrowT (AppT (ConT ''Maybe) (VarT (valNames!!0))))
@@ -1194,7 +1216,7 @@ gen_toListClause tc _ =
     error ("Error:gen_toListClause: malformed trie constructor: " ++ show tc)
 
 {-
-toListn2 :: (KeyMap.KeyMap ak am, KeyMap.KeyMap bk bm) => (am (bm val)) -> [val]
+toListn2 :: (KeyMap ak am, KeyMap bk bm) => (am (bm val)) -> [val]
 toListn2 m = concatMap KeyMap.toList (KeyMap.toList m)
 
 toListn3 m = concatMap KeyMap.toList (concatMap KeyMap.toList (KeyMap.toList m))
