@@ -19,6 +19,7 @@ Cabal-Version: >= 1.8
 Extra-Source-Files:
     Setup.hs
     README
+    exmaples/TreeTrie.hs
 
 Source-Repository head
     Type:     git
