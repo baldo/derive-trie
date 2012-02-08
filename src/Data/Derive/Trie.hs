@@ -58,7 +58,6 @@ import qualified Data.Map
 import qualified Data.IntMap
 import Data.Array
 
-
 -- trie types for some primitive types like Int,Char, ..
 prim2trie :: [(Type,Type)]
 prim2trie = [(ConT ''Int,    ConT ''Data.IntMap.IntMap),
@@ -432,6 +431,7 @@ isAppT _          = False
 -- replaces recursively every key type by the corresponding trie type, as
 -- specified in key2trie
 replaceKeyByTrie :: [(Type,Type)] -> Type -> Type
+replaceKeyByTrie key2trie ListT = replaceKeyByTrie key2trie $ ConT ''[]
 replaceKeyByTrie key2trie (AppT t1 t2) =
    AppT (replaceKeyByTrie key2trie t1) (replaceKeyByTrie key2trie t2)
 replaceKeyByTrie key2trie keyType =
@@ -603,7 +603,7 @@ getConstrsOfDataDec knownDecs dec =
     DataD _ _ _ cons _ -> return cons
     NewtypeD _ _ _ con _ -> return [con]
     TySynD name _ t    -> do
-       let (ConT newname) = getOutermostTypeOfType t
+       let ConT newname =  getOutermostTypeOfType t
        tdec <- doReify knownDecs newname
        getConstrsOfDataDec knownDecs tdec
     _                 -> error "Error:getConstrsOfDataDec: not implemented!"
@@ -620,6 +620,7 @@ getConstrsOfDataDec knownDecs dec =
 
 getOutermostTypeOfType :: Type -> Type
 getOutermostTypeOfType (AppT t1 t2) = getOutermostTypeOfType t1
+getOutermostTypeOfType ListT = ConT ''[]
 getOutermostTypeOfType t = t
 
 -- returns the constructor for the empty trie
